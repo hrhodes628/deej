@@ -1,6 +1,6 @@
-constexpr byte channels = 3;
-constexpr byte packLen = 4 + channels * 2;
 constexpr byte analogInputs[] = {A0,A1,A2};
+constexpr byte channels = sizeof(analogInputs);
+constexpr byte packLen = 4 + channels * 2;
 constexpr byte updatemillis = 17;
 
 namespace iBus{

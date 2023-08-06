@@ -19,6 +19,7 @@ import (
 type SerialIO struct {
 	comPort  string
 	baudRate uint
+	nChannels byte
 
 	deej   *Deej
 	logger *zap.SugaredLogger
@@ -33,8 +34,6 @@ type SerialIO struct {
 
 	sliderMoveConsumers []chan SliderMoveEvent
 }
-const nChannels byte = 3
-const packLen byte = 4 + nChannels*2
 
 // SliderMoveEvent represents a single slider move captured by deej
 type SliderMoveEvent struct {
@@ -199,18 +198,41 @@ func (sio *SerialIO) close(logger *zap.SugaredLogger) {
 	sio.connected = false
 }
 
-func (sio *SerialIO) readLine(logger *zap.SugaredLogger, reader *bufio.Reader) chan [0x0a]byte {
-	ch := make(chan [packLen]byte)
+// func (sio *SerialIO) getPackLen(logger *zap.SugaredLogger, reader *bufio.Reader) byte{
+	// for {
+		// peek, _ := reader.Peek(2)
+			
+		// if peek[1] == 0x40{
+			// return peek[0]
+		// }else{
+			// _, err := reader.Discard(1)
+				
+			// if err != nil{
+				
+				// if sio.deej.Verbose() {
+					// logger.Warnw("Failed to discard Serial data from buffer", "error", err)
+				// }
+			// }
+		// }
+	// }
+// }
 
+func (sio *SerialIO) readLine(logger *zap.SugaredLogger, reader *bufio.Reader) chan [36]byte {
+	//make a large array to allow up to 16 channels 
+	ch := make(chan [36]byte)
+	var packLen byte
+	
 	go func() {
 		for {
 			for {
-				peek, _ := reader.Peek(1)
+				peek, _ := reader.Peek(2)
 				
-				if peek[0] == packLen{
+				if peek[1] == 0x40{
+					//find length of packet from first byte
+					packLen = peek[0]
 					break
 				}else{
-					_, err := reader.ReadByte()
+					_, err := reader.Discard(1)
 					
 					if err != nil{
 					
@@ -226,7 +248,7 @@ func (sio *SerialIO) readLine(logger *zap.SugaredLogger, reader *bufio.Reader) c
 					// fmt.Println("waiting for data");
 				// }
 			// }
-			var ibusPacket [packLen] byte 
+			var ibusPacket [36] byte 
 			for i := byte(0); i < packLen; i++{
 				
 				var err error
@@ -254,8 +276,10 @@ func (sio *SerialIO) readLine(logger *zap.SugaredLogger, reader *bufio.Reader) c
 	return ch
 }
 
-func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, ibusPacket [packLen]byte) {
-	
+func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, ibusPacket [36]byte) {
+	//find length of packet from first byte
+	packLen := ibusPacket[0]
+	nChannels := (packLen - 4)/2
 	//check against checksum if packet is malformed 
 	var ibusChecksum uint16 = uint16(ibusPacket[packLen-2]) | uint16(ibusPacket[packLen-1]) << 8
 	var runningTotal uint16 = 0
@@ -268,7 +292,7 @@ func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, ibusPacket [packLen]b
 		return
 	}
 	
-	var ibusNumbers [nChannels] uint16
+	var ibusNumbers [16] uint16
 	for i := 0; i < int(nChannels); i++{
 		ibusNumbers[i] = uint16(ibusPacket[2*i+2]) | uint16(ibusPacket[2*i + 3]) << 8
 	}

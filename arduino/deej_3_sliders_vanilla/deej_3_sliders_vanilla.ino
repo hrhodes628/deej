@@ -1,4 +1,5 @@
 constexpr byte analogInputs[] = {A0,A1,A2};
+constexpr long baudRate = 9600;
 constexpr byte channels = sizeof(analogInputs);
 constexpr byte packLen = 4 + channels * 2;
 constexpr byte updatemillis = 17;
@@ -26,7 +27,7 @@ namespace iBus{
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(9600);
+  Serial.begin(baudRate);
   pinMode(LED_BUILTIN, OUTPUT);
 }
 

@@ -98,7 +98,6 @@ func (sio *SerialIO) Start() error {
 	var err error
 	sio.conn, err = serial.Open(sio.connOptions)
 	if err != nil {
-
 		// might need a user notification here, TBD
 		sio.logger.Warnw("Failed to open serial connection", "error", err)
 		return fmt.Errorf("open serial connection: %w", err)
@@ -113,7 +112,6 @@ func (sio *SerialIO) Start() error {
 	go func() {
 		connReader := bufio.NewReader(sio.conn)
 		lineChannel := sio.readLine(namedLogger, connReader)
-
 		for {
 			select {
 			case <-sio.stopChannel:
@@ -198,25 +196,6 @@ func (sio *SerialIO) close(logger *zap.SugaredLogger) {
 	sio.connected = false
 }
 
-// func (sio *SerialIO) getPackLen(logger *zap.SugaredLogger, reader *bufio.Reader) byte{
-	// for {
-		// peek, _ := reader.Peek(2)
-			
-		// if peek[1] == 0x40{
-			// return peek[0]
-		// }else{
-			// _, err := reader.Discard(1)
-				
-			// if err != nil{
-				
-				// if sio.deej.Verbose() {
-					// logger.Warnw("Failed to discard Serial data from buffer", "error", err)
-				// }
-			// }
-		// }
-	// }
-// }
-
 func (sio *SerialIO) readLine(logger *zap.SugaredLogger, reader *bufio.Reader) chan [36]byte {
 	//make a large array to allow up to 16 channels 
 	ch := make(chan [36]byte)
@@ -225,6 +204,7 @@ func (sio *SerialIO) readLine(logger *zap.SugaredLogger, reader *bufio.Reader) c
 	go func() {
 		for {
 			for {
+				//cycle to start of packet
 				peek, _ := reader.Peek(2)
 				
 				if peek[1] == 0x40{
@@ -243,11 +223,6 @@ func (sio *SerialIO) readLine(logger *zap.SugaredLogger, reader *bufio.Reader) c
 					}
 				}
 			}
-			// for{
-				// if reader.Buffered() >= 0x0a{
-					// fmt.Println("waiting for data");
-				// }
-			// }
 			var ibusPacket [36] byte 
 			for i := byte(0); i < packLen; i++{
 				
@@ -289,6 +264,9 @@ func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, ibusPacket [36]byte) 
 	}
 	
 	if ibusChecksum + runningTotal != 0xffff{
+		if sio.deej.Verbose() {
+			logger.Debugw("checksum invalid", "packet", ibusPacket)
+		}
 		return
 	}
 	
